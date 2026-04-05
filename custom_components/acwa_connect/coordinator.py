@@ -572,4 +572,8 @@ class AcwaDataUpdateCoordinator(DataUpdateCoordinator[PoolState]):
         except AcwaAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except AcwaApiError as err:
+            if self.data is not None:
+                # Erreur passagère : on conserve les dernières valeurs connues
+                _LOGGER.warning("ACWA : erreur API, données précédentes conservées : %s", err)
+                return self.data
             raise UpdateFailed(str(err)) from err
