@@ -1,0 +1,100 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ACWA Connect",
+        "description": "Capturez le trafic de l'app ACWA avec Proxyman. Collez ici le token Bearer (valide 24h) et le Google refresh token (permanent, pour renouvellement automatique).",
+        "data": {
+          "access_token": "Token Bearer ACWA (access token)",
+          "google_refresh_token": "Google refresh token (1//034... — renouvellement automatique)"
+        }
+      },
+      "pick_pool": {
+        "title": "Choisir une piscine",
+        "data": {
+          "pool": "Piscine"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Renouveler le token ACWA Connect",
+        "description": "Le token d'accès a expiré. Capturez un nouveau token depuis l'app.",
+        "data": {
+          "access_token": "Nouveau token Bearer",
+          "refresh_token": "Nouveau refresh token (optionnel)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Token invalide ou expiré.",
+      "cannot_connect": "Impossible de se connecter à l'API ACWA Connect.",
+      "unknown": "Erreur inattendue."
+    },
+    "abort": {
+      "already_configured": "Cette piscine est déjà configurée."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": { "name": "Température eau" },
+      "ph": { "name": "pH" },
+      "orp": { "name": "ORP / Redox" },
+      "pump_power": { "name": "Puissance pompe" },
+      "pump_current": { "name": "Courant pompe" },
+      "pump_speed": { "name": "Vitesse pompe" },
+      "electro_temperature": { "name": "Température électrolyseur" },
+      "last_event": { "name": "Dernière alerte" },
+      "last_event_type": { "name": "Type dernière alerte" },
+      "energy_total": { "name": "Énergie totale pompe" }
+    },
+    "binary_sensor": {
+      "flow": { "name": "Débit eau" },
+      "mqtt_connected": { "name": "Connexion cloud" },
+      "electro_alarm": { "name": "Alarme électrolyseur" },
+      "electro_winter": { "name": "Protection hivernage" },
+      "ph_overdose": { "name": "Protection surdosage pH" },
+      "ph_tank_empty": { "name": "Bidon pH vide" },
+      "ph_probe_ok": { "name": "Défaut sonde pH" },
+      "rx_probe_ok": { "name": "Défaut sonde Rx" }
+    },
+    "switch": {
+      "pump": { "name": "Pompe filtration" },
+      "electrolysis": { "name": "Électrolyseur" },
+      "ph_regulation": { "name": "Régulation pH" },
+      "robot": { "name": "Robot / Surpresseur" }
+    },
+    "light": {
+      "light": { "name": "Éclairage piscine" }
+    },
+    "button": {
+      "ph_priming": { "name": "Amorçage pompe pH" }
+    },
+    "cover": {
+      "cover": { "name": "Volet piscine" }
+    },
+    "number": {
+      "ph_setpoint": { "name": "Consigne pH" },
+      "orp_setpoint": { "name": "Consigne ORP / Redox" },
+      "pump_speed_manual": { "name": "Vitesse manuelle pompe" },
+      "electro_winter_temp": { "name": "Seuil hivernage" }
+    },
+    "select": {
+      "pump_mode": {
+        "name": "Mode pompe filtration",
+        "state": {
+          "Arrêt": "Arrêt",
+          "Manuel": "Manuel",
+          "Automatique": "Automatique"
+        }
+      },
+      "electro_mode": {
+        "name": "Mode électrolyseur",
+        "state": {
+          "Arrêt": "Arrêt",
+          "Manuel": "Manuel",
+          "Horloge": "Horloge",
+          "Régulation Rx": "Régulation Rx"
+        }
+      }
+    }
+  }
+}

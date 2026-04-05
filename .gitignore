@@ -1,0 +1,38 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+
+# Certificats MQTT — NE JAMAIS committer
+*.key
+*.crt
+*.pem
+*.p12
+acwa_mqtt_certs/
+
+# Tokens et secrets
+token.txt
+tokens.json
+secrets.yaml
+
+# Fichiers de debug
+/tmp/mqtt_acwa_log.json
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
