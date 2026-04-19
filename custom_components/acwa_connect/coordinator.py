@@ -550,6 +550,11 @@ class AcwaDataUpdateCoordinator(DataUpdateCoordinator[PoolState]):
     async def _async_update_data(self) -> PoolState:
         try:
             raw = await self.client.get_pool_data(self.pool_id)
+            if not isinstance(raw, list) or not raw:
+                if self.data is not None:
+                    _LOGGER.warning("ACWA : réponse API vide, données précédentes conservées")
+                    return self.data
+                raise UpdateFailed("Réponse API vide ou invalide")
             state = PoolState.from_api(raw)
 
             # Dernier événement (non bloquant — on ignore si ça échoue)
