@@ -1,11 +1,11 @@
 {
   "domain": "acwa_connect",
   "name": "ACWA Connect",
-  "version": "1.0.0",
   "codeowners": ["@Croustipate"],
   "config_flow": true,
   "documentation": "https://github.com/Croustipate/acwa-connect-ha",
-  "issue_tracker": "https://github.com/Croustipate/acwa-connect-ha/issues",
   "iot_class": "cloud_polling",
-  "requirements": ["paho-mqtt>=2.0.0"]
+  "issue_tracker": "https://github.com/Croustipate/acwa-connect-ha/issues",
+  "requirements": ["paho-mqtt>=2.0.0"],
+  "version": "1.0.0"
 }
