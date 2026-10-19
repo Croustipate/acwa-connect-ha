@@ -52,7 +52,7 @@ Cette intégration a été développée par rétro-ingénierie de l'application 
 - Authentification : Bearer token (JWT Google → ACWA)
 - Lecture : `GET /pool/{id}/data` — retourne une liste de blocs de données
 - Écriture : `PATCH /pool/{id}/data` avec les champs à modifier
-- Certificat TLS : auto-signé (vérification désactivée)
+- TLS : certificat vérifié (session HTTP par défaut de Home Assistant)
 
 ### MQTT Scaleway IoT
 La lumière, le robot/surpresseur et l'amorçage pH ne sont **pas accessibles via REST**. Ils passent par un broker MQTT Scaleway hébergé sur `iot.fr-par.scw.cloud:8883`.
@@ -77,8 +77,11 @@ Certificat client TLS (X.509) récupéré depuis `GET /me` :
 - `scalewayKey` → clé privée PEM
 - `scalewayCert` → certificat client PEM
 
-**Découverte du device_id du module relais :**  
-Au premier démarrage, l'intégration s'abonne à `+/CRX/DATA/0300` etc. Le premier message retenu (retained) contient le device_id dans le premier segment du topic. Ce device_id est ensuite persisté dans le Store HA (`acwa_connect_mqtt_{pool_id}`) pour éviter une redécouverte à chaque redémarrage.
+**TLS MQTT :**  
+Le broker Scaleway IoT Hub présente un certificat signé par la CA privée de Scaleway. Cette CA est embarquée dans l'intégration (`certs/scaleway-iot-hub-ca.pem`, source : [iot-hub-ca-ecdsa.pem](https://iot.s3.nl-ams.scw.cloud/certificates/fr-par/iot-hub-ca-ecdsa.pem)) ; le certificat serveur et le nom d'hôte sont vérifiés.
+
+**device_id du module relais :**  
+Les commandes MQTT ne sont envoyées qu'au device_id renseigné dans les **options de l'intégration** (`Paramètres → Appareils et services → ACWA Connect → Configurer`). Seuls les topics de ce device sont écoutés. Pour le trouver, lancez `tools/mqtt_diff.py`, actionnez la lumière depuis l'app officielle : le device_id est le premier segment du topic `DEVICE_ID/CRX/DATA/0300`.
 
 ### Renouvellement automatique du token
 Le token ACWA expire toutes les ~24h. Pour un renouvellement automatique :
@@ -225,7 +228,7 @@ python tools/mqtt_test_cmd.py robot off
 
 1. Vérifiez les logs HA : `Paramètres → Journaux → Filtre "acwa"`
 2. Cherchez `MQTT ACWA : connecté au broker Scaleway` — si absent, le certificat est invalide
-3. Cherchez `MQTT ACWA : device relais découvert` — si absent, déclenchez une action depuis l'app officielle pour forcer la découverte
+3. Vérifiez que le device_id du module relais est renseigné dans les options de l'intégration
 4. Vérifiez que `paho-mqtt` est installé (présent dans `manifest.json`)
 
 ### Le token expire toutes les 24h
@@ -241,7 +244,7 @@ rm -rf /config/custom_components/acwa_connect/__pycache__
 
 ### Les entités lumière/robot/amorçage sont "indisponibles"
 
-C'est normal au premier démarrage si le device_id n'a pas encore été découvert. Utilisez l'app officielle une fois pour déclencher des messages CRX — l'intégration découvrira le device automatiquement et persistera l'ID.
+Le device_id du module relais n'est pas renseigné dans les options de l'intégration (voir « device_id du module relais » plus haut).
 
 ---
 
@@ -277,7 +280,6 @@ tools/
 
 - Cette intégration est **non-officielle** et n'est pas affiliée à ACWA.
 - Elle repose sur une API privée qui peut changer sans préavis.
-- La désactivation de la vérification TLS est nécessaire car le broker Scaleway utilise un certificat auto-signé non reconnu par les CA standards.
 - Ne commitez jamais vos tokens ou certificats dans un dépôt Git.
 
 ---

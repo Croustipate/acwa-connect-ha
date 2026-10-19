@@ -5,17 +5,22 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import aiohttp
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_ACCESS_TOKEN,
     CONF_GOOGLE_REFRESH_TOKEN,
     CONF_POOL_ID,
+    CONF_MQTT_DEVICE_ID,
     CONF_POOL_NAME,
-    CONF_REFRESH_TOKEN,
     DOMAIN,
 )
 from .coordinator import AcwaApiClient, AcwaAuthError, AcwaApiError
@@ -34,6 +39,12 @@ class AcwaConnectConfigFlow(ConfigFlow, domain=DOMAIN):
     """Gère le flux de configuration ACWA Connect."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Options : device_id du module relais MQTT."""
+        return AcwaConnectOptionsFlow()
 
     def __init__(self) -> None:
         self._access_token: str = ""
@@ -113,26 +124,34 @@ class AcwaConnectConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            entry = self._get_reauth_entry()
             new_token = user_input[CONF_ACCESS_TOKEN].strip()
-            new_refresh = user_input.get(CONF_REFRESH_TOKEN, "").strip()
+            # Champ vide → on conserve le Google refresh token déjà enregistré
+            new_google_refresh = (
+                user_input.get(CONF_GOOGLE_REFRESH_TOKEN, "").strip()
+                or entry.data.get(CONF_GOOGLE_REFRESH_TOKEN)
+                or None
+            )
 
             session = async_get_clientsession(self.hass)
             client = AcwaApiClient(
                 session=session,
                 access_token=new_token,
-                refresh_token=new_refresh or None,
+                google_refresh_token=new_google_refresh,
             )
             try:
                 await client.get_pools()
-            except (AcwaAuthError, AcwaApiError):
+            except AcwaAuthError:
                 errors["base"] = "invalid_auth"
+            except AcwaApiError:
+                errors["base"] = "cannot_connect"
             else:
-                entry = self._get_reauth_entry()
                 return self.async_update_reload_and_abort(
                     entry,
                     data_updates={
-                        CONF_ACCESS_TOKEN: new_token,
-                        CONF_REFRESH_TOKEN: new_refresh or None,
+                        # client.access_token : token éventuellement renouvelé pendant la validation
+                        CONF_ACCESS_TOKEN: client.access_token,
+                        CONF_GOOGLE_REFRESH_TOKEN: new_google_refresh,
                     },
                 )
 
@@ -157,4 +176,29 @@ class AcwaConnectConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_POOL_ID: pool_id,
                 CONF_POOL_NAME: pool_name,
             },
+        )
+
+
+class AcwaConnectOptionsFlow(OptionsFlow):
+    """Options ACWA Connect."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(
+                data={CONF_MQTT_DEVICE_ID: user_input.get(CONF_MQTT_DEVICE_ID, "").strip()}
+            )
+
+        current = self.config_entry.options.get(CONF_MQTT_DEVICE_ID, "")
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_MQTT_DEVICE_ID,
+                        description={"suggested_value": current},
+                    ): str,
+                }
+            ),
         )

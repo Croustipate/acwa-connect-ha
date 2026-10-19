@@ -35,10 +35,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Certificat auto-signé Scaleway — on désactive la vérification
-_SSL_CONTEXT = ssl.create_default_context()
-_SSL_CONTEXT.check_hostname = False
-_SSL_CONTEXT.verify_mode = ssl.CERT_NONE
+# CA privée de Scaleway IoT Hub (le broker ne chaîne pas vers une CA publique).
+# Source : https://iot.s3.nl-ams.scw.cloud/certificates/fr-par/iot-hub-ca-ecdsa.pem
+MQTT_CA_FILE = os.path.join(os.path.dirname(__file__), "certs", "scaleway-iot-hub-ca.pem")
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +202,6 @@ class AcwaApiClient:
                 method,
                 url,
                 headers=self._headers,
-                ssl=_SSL_CONTEXT,
                 timeout=aiohttp.ClientTimeout(total=API_TIMEOUT),
                 **kwargs,
             ) as resp:
@@ -215,7 +213,6 @@ class AcwaApiClient:
                             method,
                             url,
                             headers=self._headers,
-                            ssl=_SSL_CONTEXT,
                             timeout=aiohttp.ClientTimeout(total=API_TIMEOUT),
                             **kwargs,
                         ) as resp2:
@@ -284,7 +281,6 @@ class AcwaApiClient:
                     "User-Agent": API_USER_AGENT,
                     "Accept": "application/json",
                 },
-                ssl=_SSL_CONTEXT,
                 timeout=aiohttp.ClientTimeout(total=API_TIMEOUT),
             ) as resp:
                 if resp.status not in (200, 202):
@@ -337,9 +333,8 @@ class AcwaMqttClient:
     Client MQTT pour les équipements non accessibles via REST.
 
     Se connecte au broker Scaleway avec les certificats du compte (issus
-    de GET /me) et auto-découvre le device_id des relais en écoutant les
-    topics CRX (commandes app→device) — le premier device à recevoir des
-    commandes CRX est le module relais.
+    de GET /me). Le device_id du module relais est fourni explicitement
+    (options de l'intégration) : seuls ses topics sont écoutés et pilotés.
     """
 
     def __init__(
@@ -348,25 +343,20 @@ class AcwaMqttClient:
         scaleway_key: str,
         scaleway_cert: str,
         coordinator: "AcwaDataUpdateCoordinator",
-        device_id: str | None = None,
-        on_device_discovered: Any = None,
+        device_id: str,
     ) -> None:
         self._hass = hass
         self._scaleway_key = scaleway_key
         self._scaleway_cert = scaleway_cert
         self._coordinator = coordinator
         self._client = None
-        self._device_id: str | None = device_id
-        self._on_device_discovered = on_device_discovered  # callback(device_id)
-        self._tmp_files: list[str] = []
+        self._device_id = device_id
         self._lock = threading.Lock()
-        if device_id:
-            _LOGGER.warning("MQTT ACWA : device_id chargé depuis config : %s", device_id)
 
     # ── Cycle de vie ────────────────────────────────────────────────────────
 
     def start(self) -> None:
-        """Lance le client paho en thread background."""
+        """Lance le client paho en thread background (à appeler hors event loop)."""
         try:
             import paho.mqtt.client as mqtt
         except ImportError:
@@ -390,28 +380,22 @@ class AcwaMqttClient:
             _LOGGER.warning("MQTT ACWA : démarrage impossible : %s", err)
 
     def stop(self) -> None:
-        """Arrête proprement le client MQTT."""
+        """Arrête le client MQTT. Bloquant (join du thread paho) : à appeler hors event loop."""
         with self._lock:
             client = self._client
             self._client = None
         if client:
             try:
-                client.loop_stop()
                 client.disconnect()
+                client.loop_stop()
             except Exception:
                 pass
-        for path in self._tmp_files:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
-        self._tmp_files.clear()
 
     @property
     def is_ready(self) -> bool:
-        """Vrai si le client MQTT est connecté et le device découvert."""
+        """Vrai si le client MQTT est démarré."""
         with self._lock:
-            return self._client is not None and self._device_id is not None
+            return self._client is not None
 
     # ── Commandes publiques ──────────────────────────────────────────────────
 
@@ -430,84 +414,63 @@ class AcwaMqttClient:
     # ── Interne ─────────────────────────────────────────────────────────────
 
     def _create_ssl_context(self) -> ssl.SSLContext:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
-            f.write(self._scaleway_cert)
-            cert_path = f.name
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
-            f.write(self._scaleway_key)
-            key_path = f.name
-        self._tmp_files.extend([cert_path, key_path])
-        ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+        """Contexte TLS vérifié : CA Scaleway IoT Hub + nom d'hôte, certificat client du compte."""
+        if not os.path.isfile(MQTT_CA_FILE):
+            raise FileNotFoundError(f"CA Scaleway IoT Hub introuvable : {MQTT_CA_FILE}")
+        ctx = ssl.create_default_context(cafile=MQTT_CA_FILE)
+        # check_hostname=True et verify_mode=CERT_REQUIRED par défaut.
+        # load_cert_chain n'accepte que des chemins : fichiers temporaires (0600)
+        # supprimés immédiatement après chargement.
+        cert_path = key_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
+                f.write(self._scaleway_cert)
+                cert_path = f.name
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
+                f.write(self._scaleway_key)
+                key_path = f.name
+            ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
+        finally:
+            for path in (cert_path, key_path):
+                if path:
+                    try:
+                        os.unlink(path)
+                    except OSError:
+                        pass
         return ctx
+
+    def _topic(self, direction: str, slot: str) -> str:
+        return f"{self._device_id}/{direction}/DATA/{slot}"
 
     def _publish(self, slot: str, payload: bytes) -> None:
         with self._lock:
             client = self._client
-            device_id = self._device_id
-        if not client or not device_id:
-            _LOGGER.warning("MQTT ACWA : client non prêt (device_id=%s)", device_id)
+        if not client:
+            _LOGGER.warning("MQTT ACWA : client non démarré")
             return
-        topic = f"{device_id}/CRX/DATA/{slot}"
+        topic = self._topic("CRX", slot)
         client.publish(topic, payload)
         _LOGGER.debug("MQTT ACWA : publish %s ← %s", topic, payload)
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:
-            _LOGGER.warning("MQTT ACWA : connecté au broker Scaleway")
-            # CRX = commandes app→device : retained → donne immédiatement le bon device_id
-            client.subscribe(f"+/CRX/DATA/{MQTT_SLOT_LIGHT}")
-            client.subscribe(f"+/CRX/DATA/{MQTT_SLOT_ROBOT}")
-            client.subscribe(f"+/CRX/DATA/{MQTT_SLOT_PH_PRIME}")
-            # CTX = état device→cloud : mises à jour en temps réel
-            client.subscribe(f"+/CTX/DATA/{MQTT_SLOT_LIGHT}")
-            client.subscribe(f"+/CTX/DATA/{MQTT_SLOT_ROBOT}")
+            _LOGGER.info("MQTT ACWA : connecté au broker Scaleway (device %s)", self._device_id)
+            # CTX = état device→cloud, uniquement pour le device configuré
+            client.subscribe(self._topic("CTX", MQTT_SLOT_LIGHT))
+            client.subscribe(self._topic("CTX", MQTT_SLOT_ROBOT))
         else:
             _LOGGER.warning("MQTT ACWA : connexion refusée (code %s)", reason_code)
 
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties=None):
-        _LOGGER.warning("MQTT ACWA : déconnecté (code %s)", reason_code)
+        _LOGGER.info("MQTT ACWA : déconnecté (code %s)", reason_code)
 
     def _on_message(self, client, userdata, msg):
         """Appelé depuis le thread paho — mise à jour thread-safe du coordinateur."""
-        parts = msg.topic.split("/")
-        if len(parts) < 4:
-            return
-        device_id = parts[0]
-        direction = parts[1]  # CTX ou CRX
-        slot = parts[-1]
         payload_str = msg.payload.decode("ascii", errors="replace")
-
-        # CRX = commandes venant de l'app → ce device est le module relais
-        if direction == "CRX":
-            with self._lock:
-                if self._device_id is not None:
-                    # Device déjà connu — on ignore tous les autres CRX
-                    return
-                # Premier CRX reçu → c'est notre module relais
-                self._device_id = device_id
-                _LOGGER.warning(
-                    "MQTT ACWA : device relais découvert via CRX : %s", device_id
-                )
-            if self._on_device_discovered:
-                # call_soon_threadsafe car on est dans le thread paho
-                self._hass.loop.call_soon_threadsafe(
-                    self._on_device_discovered, device_id
-                )
-                with self._lock:
-                    self._on_device_discovered = None
-            return  # les CRX ne portent pas l'état courant
-
-        # CTX = état publié par le device
-        if direction != "CTX":
-            return
-
-        if slot == MQTT_SLOT_LIGHT:
+        if msg.topic == self._topic("CTX", MQTT_SLOT_LIGHT):
             light_on = payload_str in ("0100", "01")
             self._hass.loop.call_soon_threadsafe(self._set_light, light_on)
-        elif slot == MQTT_SLOT_ROBOT:
+        elif msg.topic == self._topic("CTX", MQTT_SLOT_ROBOT):
             robot_on = payload_str in ("0001", "01")
             self._hass.loop.call_soon_threadsafe(self._set_robot, robot_on)
 

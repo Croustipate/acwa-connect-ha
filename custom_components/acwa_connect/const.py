@@ -7,6 +7,7 @@ CONF_ACCESS_TOKEN = "access_token"
 CONF_REFRESH_TOKEN = "refresh_token"
 CONF_POOL_ID = "pool_id"
 CONF_POOL_NAME = "pool_name"
+CONF_MQTT_DEVICE_ID = "mqtt_device_id"  # option : device_id du module relais (MQTT)
 
 # API
 API_BASE_URL = "https://api.acwa-connect.com/api/v1"
