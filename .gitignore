@@ -36,3 +36,5 @@ secrets.yaml
 .idea/
 *.swp
 *.swo
+# CA publique Scaleway IoT Hub embarquée (pas un secret)
+!custom_components/acwa_connect/certs/scaleway-iot-hub-ca.pem
