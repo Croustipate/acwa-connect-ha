@@ -115,7 +115,7 @@ class AcwaConnectConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Ré-authentification quand le token expire."""
-        return await self.async_step_reauth_confirm(user_input)
+        return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None

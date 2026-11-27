@@ -1,0 +1,170 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ACWA Connect",
+        "description": "Capture the ACWA app's traffic with Proxyman. Paste the Bearer token (valid 24h) and the Google refresh token (permanent, for automatic renewal) here.\n\n{help}",
+        "data": {
+          "access_token": "ACWA Bearer token (access token)",
+          "google_refresh_token": "Google refresh token (1//034... — automatic renewal)"
+        }
+      },
+      "pick_pool": {
+        "title": "Choose a pool",
+        "data": {
+          "pool": "Pool"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Renew the ACWA Connect token",
+        "description": "The access token has expired. Capture a new token from the app. Leave the Google refresh token empty to keep the one already stored.",
+        "data": {
+          "access_token": "New Bearer token",
+          "google_refresh_token": "New Google refresh token (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid or expired token.",
+      "cannot_connect": "Unable to connect to the ACWA Connect API.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This pool is already configured.",
+      "reauth_successful": "Token renewed successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ACWA Connect options",
+        "description": "Device ID of the e.Box relay module used for the light, the robot, and pH priming (MQTT). It appears in the `DEVICE_ID/CTX/DATA/...` topics (see tools/mqtt_diff.py in the README). Leave empty to disable these commands.",
+        "data": {
+          "mqtt_device_id": "Relay module device ID"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Water temperature"
+      },
+      "ph": {
+        "name": "pH"
+      },
+      "orp": {
+        "name": "ORP / Redox"
+      },
+      "pump_power": {
+        "name": "Pump power"
+      },
+      "pump_current": {
+        "name": "Pump current"
+      },
+      "pump_speed": {
+        "name": "Pump speed"
+      },
+      "electro_temperature": {
+        "name": "Electrolyzer temperature"
+      },
+      "last_event": {
+        "name": "Last alert"
+      },
+      "last_event_type": {
+        "name": "Last alert type"
+      },
+      "energy_total": {
+        "name": "Pump total energy"
+      }
+    },
+    "binary_sensor": {
+      "flow": {
+        "name": "Water flow"
+      },
+      "mqtt_connected": {
+        "name": "Cloud connection"
+      },
+      "electro_alarm": {
+        "name": "Electrolyzer alarm"
+      },
+      "electro_winter": {
+        "name": "Winterization protection"
+      },
+      "ph_overdose": {
+        "name": "pH overdose protection"
+      },
+      "ph_tank_empty": {
+        "name": "pH tank empty"
+      },
+      "ph_probe_ok": {
+        "name": "pH probe fault"
+      },
+      "rx_probe_ok": {
+        "name": "Rx probe fault"
+      }
+    },
+    "switch": {
+      "pump": {
+        "name": "Filtration pump"
+      },
+      "electrolysis": {
+        "name": "Electrolyzer"
+      },
+      "ph_regulation": {
+        "name": "pH regulation"
+      },
+      "robot": {
+        "name": "Robot / Booster pump"
+      }
+    },
+    "light": {
+      "light": {
+        "name": "Pool light"
+      }
+    },
+    "button": {
+      "ph_priming": {
+        "name": "pH pump priming"
+      }
+    },
+    "cover": {
+      "cover": {
+        "name": "Pool cover"
+      }
+    },
+    "number": {
+      "ph_setpoint": {
+        "name": "pH setpoint"
+      },
+      "orp_setpoint": {
+        "name": "ORP / Redox setpoint"
+      },
+      "pump_speed_manual": {
+        "name": "Manual pump speed"
+      },
+      "electro_winter_temp": {
+        "name": "Winterization threshold"
+      }
+    },
+    "select": {
+      "pump_mode": {
+        "name": "Filtration pump mode",
+        "state": {
+          "Arrêt": "Off",
+          "Manuel": "Manual",
+          "Automatique": "Automatic"
+        }
+      },
+      "electro_mode": {
+        "name": "Electrolyzer mode",
+        "state": {
+          "Arrêt": "Off",
+          "Manuel": "Manual",
+          "Horloge": "Clock",
+          "Régulation Rx": "Rx regulation"
+        }
+      }
+    }
+  }
+}
