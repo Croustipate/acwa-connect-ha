@@ -149,21 +149,10 @@
     },
     "select": {
       "pump_mode": {
-        "name": "Filtration pump mode",
-        "state": {
-          "Arrêt": "Off",
-          "Manuel": "Manual",
-          "Automatique": "Automatic"
-        }
+        "name": "Filtration pump mode"
       },
       "electro_mode": {
-        "name": "Electrolyzer mode",
-        "state": {
-          "Arrêt": "Off",
-          "Manuel": "Manual",
-          "Horloge": "Clock",
-          "Régulation Rx": "Rx regulation"
-        }
+        "name": "Electrolyzer mode"
       }
     }
   }
